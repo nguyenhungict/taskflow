@@ -4,10 +4,17 @@
   "description": "Task Management API with MVC pattern",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node actions/server.js",
+    "dev": "nodemon actions/server.js",
+    "client": "cd client && npm run dev",
+    "server": "nodemon actions/server.js"
   },
-  "keywords": ["task", "management", "api", "mvc"],
+  "keywords": [
+    "task",
+    "management",
+    "api",
+    "mvc"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

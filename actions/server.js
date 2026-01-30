@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/database');
 const taskRoutes = require('./routes/taskRoutes');
 
-dotenv.config();
+dotenv.config({ path: '../.env' });
 
 connectDB();
 
@@ -14,6 +14,9 @@ app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from client directory
+app.use(express.static('../client/public'));
 
 app.use('/api/tasks', taskRoutes);
 

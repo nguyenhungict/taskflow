@@ -1,0 +1,49 @@
+/* App Container */
+.App {
+    min-height: 100vh;
+    background: #0f172a;
+}
+
+/* Content Area - Bên dưới Header */
+.content {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.content h1 {
+    font-size: 2rem;
+    color: #f1f5f9;
+    margin-bottom: 1rem;
+}
+
+.content p {
+    color: #94a3b8;
+    font-size: 1.125rem;
+    margin: 0.5rem 0;
+}
+
+/* Search Info Display */
+.search-info {
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+    border-radius: 4px;
+    color: #93c5fd !important;
+    margin: 1.5rem 0;
+}
+
+.search-info strong {
+    color: #60a5fa;
+    font-weight: 600;
+}
+
+/* Next Step Info */
+.next-step {
+    padding: 1rem;
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid #10b981;
+    border-radius: 4px;
+    color: #6ee7b7 !important;
+    margin: 1.5rem 0;
+}
