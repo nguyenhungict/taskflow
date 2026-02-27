@@ -31,6 +31,30 @@ TaskFlow is a next-generation project management platform that combines the powe
 
 ---
 
+## � Screenshots
+
+### 1. Unified Authentication
+![Login Screen](./photos/01-login.png)
+
+### 2. Intelligent Dashboard
+![Dashboard](./photos/02-dashboard.png)
+
+### 3. Project Management
+![Projects](./photos/03-projects.png)
+
+### 4. Dynamic Kanban Board
+![Kanban Board](./photos/04-board.png)
+
+### 5. Structured Task List & Calendar
+![Task List](./photos/05-list.png)
+![Calendar](./photos/06-calendar.png)
+
+### 6. Real-time Communication & AI Assistant
+![Chat](./photos/07-chat.png)
+![AI Assistant](./photos/08-ai-assistant.png)
+
+---
+
 ## 🛠️ Tech Stack
 
 ### Frontend
