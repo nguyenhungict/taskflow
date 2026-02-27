@@ -140,9 +140,10 @@ const updateProject = async (req, res) => {
         }
 
         // Update only allowed fields
-        const { name, description } = req.body;
+        const { name, description, columns } = req.body;
         if (name) project.name = name;
         if (description !== undefined) project.description = description;
+        if (columns !== undefined) project.columns = columns;
 
         await project.save();
 

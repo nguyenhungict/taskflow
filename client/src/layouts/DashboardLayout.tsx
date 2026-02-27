@@ -15,6 +15,7 @@ import {
     Home
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import AIChatbot from '../components/AIChatbot';
 
 const DashboardLayout: React.FC = () => {
     const { user, logout } = useAuth();
@@ -83,15 +84,10 @@ const DashboardLayout: React.FC = () => {
                             Communication
                         </div>
 
-                        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                            <Users size={20} className="text-purple-600" />
-                            <span className={`${!isSidebarOpen && 'hidden'}`}>Team Chat</span>
-                        </button>
-
-                        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
+                        <Link to="/messages" className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/messages') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}>
                             <MessageSquare size={20} className="text-green-600" />
                             <span className={`${!isSidebarOpen && 'hidden'}`}>Direct Messages</span>
-                        </button>
+                        </Link>
 
                         {/* Projects Section */}
                         <div className={`mt-8 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2 flex justify-between items-center ${!isSidebarOpen && 'hidden'}`}>
@@ -184,8 +180,11 @@ const DashboardLayout: React.FC = () => {
                 <div className="flex-1 overflow-hidden bg-white relative">
                     <Outlet />
                 </div>
+
+                {/* AI Chatbot Overlay */}
+                <AIChatbot />
             </main>
-        </div>
+        </div >
     );
 };
 

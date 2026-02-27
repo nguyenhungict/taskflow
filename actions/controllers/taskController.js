@@ -57,12 +57,6 @@ const getAllTasks = async (req, res) => {
 
     // Filter by status
     if (status) {
-      if (!['todo', 'in-progress', 'done'].includes(status)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid status. Must be: todo, in-progress, or done'
-        });
-      }
       query.status = status;
     }
 
@@ -361,10 +355,10 @@ const updateTaskStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!status || !['todo', 'in-progress', 'done'].includes(status)) {
+    if (!status) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status. Must be: todo, in-progress, or done'
+        message: 'Status is required'
       });
     }
 
@@ -705,10 +699,10 @@ const reorderTask = async (req, res) => {
 
     console.log(`🎯 REORDER: taskId=${req.params.id}, newStatus=${newStatus}, newPosition=${newPosition}`);
 
-    if (!newStatus || !['todo', 'in-progress', 'done'].includes(newStatus)) {
+    if (!newStatus) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status. Must be: todo, in-progress, or done'
+        message: 'New status is required'
       });
     }
 

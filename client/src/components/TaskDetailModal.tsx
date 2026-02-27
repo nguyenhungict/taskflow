@@ -8,6 +8,7 @@ import {
     deleteChecklistItem,
     updateTask
 } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 interface ChecklistItem {
     title: string;
@@ -49,14 +50,16 @@ interface TaskDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
     onUpdate?: () => void;
+    projectMembers?: any[];
 }
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ taskId, isOpen, onClose, onUpdate }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ taskId, isOpen, onClose, onUpdate, projectMembers = [] }) => {
     const [task, setTask] = useState<Task | null>(null);
     const [loading, setLoading] = useState(true);
     const [newChecklistItem, setNewChecklistItem] = useState('');
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editingTitle, setEditingTitle] = useState('');
+    const toast = useToast();
 
     useEffect(() => {
         if (isOpen && taskId) {
@@ -130,10 +133,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ taskId, isOpen, onClo
             const response = await deleteChecklistItem(task._id, index);
             if (response.success) {
                 setTask(response.data);
+                toast.success('Checklist item deleted');
                 onUpdate?.();
             }
         } catch (error) {
             console.error('Failed to delete checklist item:', error);
+            toast.error('Failed to delete checklist item');
         }
     };
 
@@ -201,6 +206,20 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ taskId, isOpen, onClo
         }
     };
 
+    const handleUpdateAssignee = async (userId: string) => {
+        if (!task) return;
+        try {
+            const response = await updateTask(task._id, { assignee: userId || null });
+            if (response.success) {
+                setTask(response.data);
+                toast.success('Assignee updated');
+                onUpdate?.();
+            }
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Failed to update assignee');
+        }
+    };
+
     return (
         <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -238,7 +257,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ taskId, isOpen, onClo
                                     </span>
                                     {task.project && (
                                         <span className="px-3 py-1 rounded-full text-xs font-normal bg-white/20 border border-white/30">
-                                             {task.project.name}
+                                            {task.project.name}
                                         </span>
                                     )}
                                 </div>
@@ -253,21 +272,18 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ taskId, isOpen, onClo
                                     {/* Assignee Card */}
                                     <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4">
                                         <div className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">Assigned to</div>
-                                        {task.assignee && typeof task.assignee === 'object' && 'username' in task.assignee ? (
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-medium text-sm shadow-sm">
-                                                    {(task.assignee as any).username.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium text-slate-900 text-sm">{(task.assignee as any).username}</div>
-                                                    {(task.assignee as any).email && (
-                                                        <div className="text-xs text-slate-500">{(task.assignee as any).email}</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="text-sm text-slate-400 italic">Unassigned</div>
-                                        )}
+                                        <select
+                                            value={task.assignee ? task.assignee._id : ''}
+                                            onChange={(e) => handleUpdateAssignee(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {projectMembers.map((member: any) => (
+                                                <option key={member._id} value={member._id}>
+                                                    {member.username} {member.email ? `(${member.email})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     {/* Start Date Card */}

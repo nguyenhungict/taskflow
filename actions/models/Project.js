@@ -28,6 +28,17 @@ const projectSchema = new mongoose.Schema({
     updatedAt: {
         type: Date,
         default: Date.now
+    },
+    columns: {
+        type: [{
+            id: String,
+            title: String
+        }],
+        default: [
+            { id: 'todo', title: 'To Do' },
+            { id: 'in-progress', title: 'In Progress' },
+            { id: 'done', title: 'Done' }
+        ]
     }
 }, {
     collection: 'projects',

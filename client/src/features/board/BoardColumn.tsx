@@ -1,15 +1,17 @@
 import React from 'react';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface BoardColumnProps {
     title: string;
     count: number;
+    onCreateClick?: () => void;
+    onDeleteClick?: () => void;
     children: React.ReactNode;
 }
 
-const BoardColumn: React.FC<BoardColumnProps> = ({ title, count, children }) => {
+const BoardColumn: React.FC<BoardColumnProps> = ({ title, count, onCreateClick, onDeleteClick, children }) => {
     return (
-        <div className="flex flex-col h-full min-w-[280px] w-[280px] bg-slate-50 rounded-lg p-2 max-h-full">
+        <div className="flex flex-col h-full w-[280px] shrink-0 bg-slate-50 rounded-lg p-2 max-h-full">
             {/* Column Header */}
             <div className="flex items-center justify-between px-2 py-3 mb-1">
                 <div className="flex items-center gap-2">
@@ -21,17 +23,19 @@ const BoardColumn: React.FC<BoardColumnProps> = ({ title, count, children }) => 
                     </span>
                 </div>
                 <div className="flex gap-1">
-                    <button className="text-slate-400 hover:bg-slate-200 p-1 rounded transition-colors">
+                    <button className="text-slate-400 hover:bg-slate-200 p-1 rounded transition-colors" onClick={onCreateClick}>
                         <Plus size={14} />
                     </button>
-                    <button className="text-slate-400 hover:bg-slate-200 p-1 rounded transition-colors">
-                        <MoreHorizontal size={14} />
-                    </button>
+                    {onDeleteClick && (
+                        <button className="text-slate-400 hover:bg-red-100 hover:text-red-500 p-1 rounded transition-colors" onClick={onDeleteClick}>
+                            <Trash2 size={14} />
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Quick Add Button (Matching Screenshot) */}
-            <button className="flex items-center gap-2 w-full px-2 py-2 mb-2 text-sm text-slate-500 hover:bg-slate-100 rounded transition-colors group">
+            <button className="flex items-center gap-2 w-full px-2 py-2 mb-2 text-sm text-slate-500 hover:bg-slate-100 rounded transition-colors group" onClick={onCreateClick}>
                 <Plus size={16} className="text-slate-400 group-hover:text-blue-500" />
                 <span className="font-medium group-hover:text-blue-600">Create</span>
             </button>

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { MoreHorizontal, CheckSquare, Clock } from 'lucide-react';
+import { CheckSquare, Clock, Trash2 } from 'lucide-react';
 import TaskDetailModal from '../../components/TaskDetailModal';
+import ConfirmModal from '../../components/ConfirmModal';
+import { deleteTask } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 interface Task {
     id: string;
@@ -20,10 +23,13 @@ interface Task {
 interface BoardCardProps {
     task: Task;
     onUpdate?: () => void;
+    projectMembers?: any[];
 }
 
-const BoardCard: React.FC<BoardCardProps> = ({ task, onUpdate }) => {
+const BoardCard: React.FC<BoardCardProps> = ({ task, onUpdate, projectMembers = [] }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const toast = useToast();
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
@@ -46,6 +52,24 @@ const BoardCard: React.FC<BoardCardProps> = ({ task, onUpdate }) => {
         setIsModalOpen(true);
     };
 
+    const handleDeleteTask = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDeleteCheck = async () => {
+        try {
+            await deleteTask(task.id);
+            toast.success('Task deleted successfully');
+            if (onUpdate) onUpdate();
+        } catch (err: any) {
+            console.error("Failed to delete task:", err);
+            toast.error("Failed to delete task: " + (err.response?.data?.message || err.message));
+        } finally {
+            setIsDeleteModalOpen(false);
+        }
+    };
+
     return (
         <>
             <div
@@ -65,13 +89,16 @@ const BoardCard: React.FC<BoardCardProps> = ({ task, onUpdate }) => {
                             </span>
                         )}
                     </div>
-                    <button
-                        data-more-button
-                        className="text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-100 p-0.5 rounded transition-all"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <MoreHorizontal size={14} />
-                    </button>
+                    <div className="flex gap-1">
+                        <button
+                            data-more-button
+                            className="text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                            onClick={handleDeleteTask}
+                            title="Delete Task"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
                 </div>
 
                 <h4 className="text-sm font-medium text-slate-900 mb-3 leading-snug group-hover:text-blue-600 transition-colors">
@@ -125,6 +152,18 @@ const BoardCard: React.FC<BoardCardProps> = ({ task, onUpdate }) => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onUpdate={onUpdate}
+                projectMembers={projectMembers}
+            />
+
+            {/* Confirm Delete Modal */}
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="Delete Task"
+                message={`Are you sure you want to delete "${task.title}"? This action cannot be undone.`}
+                confirmText="Delete"
+                isDanger={true}
+                onConfirm={confirmDeleteCheck}
+                onCancel={() => setIsDeleteModalOpen(false)}
             />
         </>
     );

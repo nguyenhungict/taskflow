@@ -13,16 +13,32 @@ import {
     Share2,
     Zap,
     Maximize2,
-    Plus
+    Plus,
+    Users
 } from 'lucide-react';
+import { useSocket } from '../contexts/SocketContext';
+import { getProjectById } from '../services/api';
 
 interface ProjectTabsProps {
     projectName: string;
+    onManageMembers?: () => void;
 }
 
-const ProjectTabs: React.FC<ProjectTabsProps> = ({ projectName }) => {
+const ProjectTabs: React.FC<ProjectTabsProps> = ({ projectName, onManageMembers }) => {
     const { projectId } = useParams();
     const location = useLocation();
+    const { onlineUsers } = useSocket();
+    const [projectMembers, setProjectMembers] = React.useState<any[]>([]);
+
+    React.useEffect(() => {
+        if (projectId) {
+            getProjectById(projectId).then(res => {
+                if (res.success && res.data?.members) {
+                    setProjectMembers(res.data.members);
+                }
+            }).catch(console.error);
+        }
+    }, [projectId]);
 
     const tabs = [
         { id: 'summary', label: 'Summary', icon: <MousePointer2 size={16} />, path: `/projects/${projectId}/summary` },
@@ -45,7 +61,38 @@ const ProjectTabs: React.FC<ProjectTabsProps> = ({ projectName }) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors">
+                    {/* Render member avatars */}
+                    <div className="flex -space-x-2 mr-2">
+                        {projectMembers.map((member: any) => {
+                            const isOnline = onlineUsers.has(member._id);
+                            return (
+                                <div key={member._id} className="relative w-8 h-8 rounded-full border-2 border-white overflow-visible bg-indigo-100 flexitems-center justify-center text-indigo-700 font-bold text-xs" title={member.username}>
+                                    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
+                                        {member.avatar ? (
+                                            <img src={member.avatar} alt="avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            member.username.charAt(0).toUpperCase()
+                                        )}
+                                    </div>
+                                    {isOnline && (
+                                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {onManageMembers && (
+                        <button
+                            onClick={onManageMembers}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+                            title="Manage Members"
+                        >
+                            <Users size={16} />
+                            <span>Members</span>
+                        </button>
+                    )}
+                    <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors" title="Share Project">
                         <Share2 size={18} />
                     </button>
                     <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors">

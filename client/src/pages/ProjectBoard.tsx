@@ -1,23 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import BoardColumn from '../features/board/BoardColumn';
 import BoardCard from '../features/board/BoardCard';
-import { Filter, Search, Plus, Settings2 } from 'lucide-react';
+import { Filter, Search, Plus, Settings2, X } from 'lucide-react';
 import { useParams } from 'react-router-dom';
-import { getProjectById, getTasks, reorderTask } from '../services/api';
+import { getProjectById, getTasks, reorderTask, updateProject } from '../services/api';
 import ProjectTabs from '../components/ProjectTabs';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import CreateTaskModal from '../components/CreateTaskModal';
+import ProjectMembersModal from '../components/ProjectMembersModal';
+import { useToast } from '../contexts/ToastContext';
 
 interface Task {
     _id: string;
     title: string;
     priority: 'low' | 'medium' | 'high';
     type: 'bug' | 'feature' | 'task';
-    status: 'todo' | 'in-progress' | 'done';
+    status: string;
     assignee?: {
         username: string;
         avatar?: string;
     };
-    // Add for typescript compatibility with new backend fields
     checklist?: { title: string; isCompleted: boolean }[];
     estimated_hours?: number;
     actual_hours?: number;
@@ -30,22 +32,39 @@ interface Project {
     members?: Array<{
         _id: string;
         username: string;
+        email: string;
         avatar?: string;
     }>;
+    columns?: {
+        id: string;
+        title: string;
+    }[];
+    owner?: any;
 }
+
+const defaultColumns = [
+    { id: 'todo', title: 'To Do' },
+    { id: 'in-progress', title: 'In Progress' },
+    { id: 'done', title: 'Done' }
+];
 
 const ProjectBoard: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
 
     const [project, setProject] = useState<Project | null>(null);
-    const [tasks, setTasks] = useState<{ todo: Task[]; inProgress: Task[]; done: Task[] }>({
-        todo: [],
-        inProgress: [],
-        done: []
-    });
+    const [tasks, setTasks] = useState<Record<string, Task[]>>({});
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+    const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+    const [createTaskStatus, setCreateTaskStatus] = useState('todo');
+
+    const [isAddingColumn, setIsAddingColumn] = useState(false);
+    const [newColumnTitle, setNewColumnTitle] = useState('');
+
+    const toast = useToast();
 
     useEffect(() => {
         if (projectId) {
@@ -72,23 +91,27 @@ const ProjectBoard: React.FC = () => {
             if (tasksRes.success) {
                 const allTasks = Array.isArray(tasksRes.data) ? tasksRes.data : [];
                 const normalize = (s: string) => (s || '').toLowerCase();
-
-                // Group tasks by status
-                // Helper to sort by position
                 const sortByPos = (a: any, b: any) => (a.position || 0) - (b.position || 0);
 
-                // Group tasks by status and sort them
-                const grouped = {
-                    todo: allTasks
-                        .filter((t: any) => normalize(t.status) === 'todo')
-                        .sort(sortByPos),
-                    inProgress: allTasks
-                        .filter((t: any) => ['in-progress', 'inprogress', 'in progress'].includes(normalize(t.status)))
-                        .sort(sortByPos),
-                    done: allTasks
-                        .filter((t: any) => normalize(t.status) === 'done')
-                        .sort(sortByPos)
-                };
+                const currentColumns = projectRes.data?.columns && projectRes.data.columns.length > 0 ? projectRes.data.columns : defaultColumns;
+                const grouped: Record<string, Task[]> = {};
+
+                // Initialize all columns with empty array
+                currentColumns.forEach((col: any) => {
+                    grouped[col.id] = [];
+                });
+
+                allTasks.forEach((t: any) => {
+                    const status = normalize(t.status);
+                    if (!grouped[status]) {
+                        grouped[status] = []; // fallback for tasks not matching any column
+                    }
+                    grouped[status].push(t);
+                });
+
+                Object.keys(grouped).forEach(key => {
+                    grouped[key].sort(sortByPos);
+                });
 
                 setTasks(grouped);
             }
@@ -105,61 +128,110 @@ const ProjectBoard: React.FC = () => {
     const handleDragEnd = async (result: DropResult) => {
         const { source, destination, draggableId } = result;
 
-        // Dropped outside valid droppable area
         if (!destination) return;
 
-        // No position change
         if (
             source.droppableId === destination.droppableId &&
             source.index === destination.index
         ) return;
 
-        // Map droppableId to status string
-        const statusMap: Record<string, 'todo' | 'in-progress' | 'done'> = {
-            'todo': 'todo',
-            'inProgress': 'in-progress',
-            'done': 'done'
-        };
+        const sourceStatus = source.droppableId;
+        const destStatus = destination.droppableId;
 
-        const sourceStatus = statusMap[source.droppableId as keyof typeof statusMap];
-        const destStatus = statusMap[destination.droppableId as keyof typeof statusMap];
-
-        // OPTIMISTIC UI UPDATE (instant feedback for user)
         const newTasks = { ...tasks };
-        const sourceColumn = [...newTasks[source.droppableId as keyof typeof newTasks]];
-        const destColumn = source.droppableId === destination.droppableId
+        const sourceColumn = [...(newTasks[sourceStatus] || [])];
+        const destColumn = sourceStatus === destStatus
             ? sourceColumn
-            : [...newTasks[destination.droppableId as keyof typeof newTasks]];
+            : [...(newTasks[destStatus] || [])];
 
-        // Remove from source
         const [movedTask] = sourceColumn.splice(source.index, 1);
 
-        // Insert into destination
-        if (source.droppableId === destination.droppableId) {
+        if (sourceStatus === destStatus) {
             sourceColumn.splice(destination.index, 0, { ...movedTask, status: destStatus });
-            newTasks[source.droppableId as keyof typeof newTasks] = sourceColumn;
+            newTasks[sourceStatus] = sourceColumn;
         } else {
             destColumn.splice(destination.index, 0, { ...movedTask, status: destStatus });
-            newTasks[source.droppableId as keyof typeof newTasks] = sourceColumn;
-            newTasks[destination.droppableId as keyof typeof newTasks] = destColumn;
+            newTasks[sourceStatus] = sourceColumn;
+            newTasks[destStatus] = destColumn;
         }
 
-        setTasks(newTasks); // Update UI immediately
+        setTasks(newTasks);
 
-        // BACKEND SYNC
         try {
             await reorderTask(draggableId, destStatus, destination.index);
-            // Refresh data in background to ensure accuracy
             if (projectId) {
                 await fetchProjectData(projectId, true);
             }
         } catch (error) {
             console.error('Failed to reorder task:', error);
-            // Rollback UI on error
             if (projectId) {
                 await fetchProjectData(projectId, true);
             }
         }
+    };
+
+    const handleAddColumn = async () => {
+        if (!newColumnTitle.trim() || !project) return;
+
+        const newColId = newColumnTitle.trim().toLowerCase().replace(/\s+/g, '-');
+        const currentColumns = project?.columns && project.columns.length > 0 ? project.columns : defaultColumns;
+
+        // Prevent duplicate IDs
+        if (currentColumns.some(c => c.id === newColId)) {
+            toast.warning('A column with a similar name already exists.');
+            return;
+        }
+
+        const newColumns = [...currentColumns, { id: newColId, title: newColumnTitle.trim() }];
+        const updatedProject = { ...project, columns: newColumns };
+
+        setProject(updatedProject);
+        setTasks(prev => ({ ...prev, [newColId]: [] })); // Optimistic update
+        setNewColumnTitle('');
+        setIsAddingColumn(false);
+
+        try {
+            await updateProject(project._id, { columns: newColumns });
+            toast.success('Column added successfully');
+        } catch (e) {
+            console.error(e);
+            if (projectId) await fetchProjectData(projectId, true);
+            toast.error('Failed to add column');
+        }
+    };
+
+    const handleDeleteColumn = async (colId: string) => {
+        if (!project) return;
+
+        if (tasks[colId] && tasks[colId].length > 0) {
+            toast.warning('Cannot delete a column that contains tasks. Please move or delete the tasks first.');
+            return;
+        }
+
+        const currentColumns = project?.columns && project.columns.length > 0 ? project.columns : defaultColumns;
+        const newColumns = currentColumns.filter(c => c.id !== colId);
+
+        if (newColumns.length === 0) {
+            toast.error('A project must have at least one column.');
+            return;
+        }
+
+        const updatedProject = { ...project, columns: newColumns };
+        setProject(updatedProject);
+
+        try {
+            await updateProject(project._id, { columns: newColumns });
+            toast.success('Column deleted successfully');
+        } catch (e) {
+            console.error(e);
+            if (projectId) await fetchProjectData(projectId, true);
+            toast.error('Failed to delete column');
+        }
+    };
+
+    const openCreateTaskModal = (status: string) => {
+        setCreateTaskStatus(status);
+        setIsCreateTaskOpen(true);
     };
 
     if (loading) {
@@ -181,12 +253,15 @@ const ProjectBoard: React.FC = () => {
         );
     }
 
+    const currentColumns = project.columns && project.columns.length > 0 ? project.columns : defaultColumns;
+
     return (
         <div className="h-full flex flex-col bg-white">
-            {/* Project Universal Tabs Header */}
-            <ProjectTabs projectName={project.name} />
+            <ProjectTabs
+                projectName={project.name}
+                onManageMembers={() => setIsMembersModalOpen(true)}
+            />
 
-            {/* Board Specific Toolbar */}
             <div className="h-14 flex items-center justify-between px-6 border-b border-slate-100 bg-white shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="relative">
@@ -226,6 +301,13 @@ const ProjectBoard: React.FC = () => {
                         <Filter size={16} />
                         Filter
                     </button>
+                    <button
+                        onClick={() => openCreateTaskModal(currentColumns[0]?.id || 'todo')}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-md transition-colors shadow-sm"
+                    >
+                        <Plus size={16} />
+                        New Task
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -238,180 +320,135 @@ const ProjectBoard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Board Columns Area */}
-            <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-slate-50/30">
+            <div className="flex-1 overflow-hidden bg-slate-50/30 relative min-w-0 min-h-0">
                 <DragDropContext onDragEnd={handleDragEnd}>
-                    <div className="flex h-full gap-6 pb-2">
-                        {/* TODO Column */}
-                        <Droppable droppableId="todo">
-                            {(provided, snapshot) => (
-                                <div
-                                    ref={provided.innerRef}
-                                    {...provided.droppableProps}
-                                    className="min-w-[320px]"
-                                >
-                                    <BoardColumn
-                                        title="To Do"
-                                        count={tasks.todo.length}
-                                    >
-                                        {tasks.todo.map((task, index) => (
-                                            <Draggable
-                                                key={task._id}
-                                                draggableId={task._id}
-                                                index={index}
+                    <div className="absolute inset-0 overflow-x-auto overflow-y-hidden custom-scrollbar">
+                        <div className="flex h-full p-6 gap-6 w-max min-w-full">
+                            {currentColumns.map((col) => (
+                                <Droppable droppableId={col.id} key={col.id}>
+                                    {(provided) => (
+                                        <div
+                                            ref={provided.innerRef}
+                                            {...provided.droppableProps}
+                                            className="h-full"
+                                        >
+                                            <BoardColumn
+                                                title={col.title}
+                                                count={tasks[col.id]?.length || 0}
+                                                onCreateClick={() => openCreateTaskModal(col.id)}
+                                                onDeleteClick={() => handleDeleteColumn(col.id)}
                                             >
-                                                {(provided, snapshot) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        style={{
-                                                            ...provided.draggableProps.style,
-                                                            opacity: snapshot.isDragging ? 0.9 : 1,
-                                                            transform: snapshot.isDragging
-                                                                ? `${provided.draggableProps.style?.transform} rotate(3deg)`
-                                                                : provided.draggableProps.style?.transform
-                                                        }}
+                                                {(tasks[col.id] || []).map((task, index) => (
+                                                    <Draggable
+                                                        key={task._id}
+                                                        draggableId={task._id}
+                                                        index={index}
                                                     >
-                                                        <BoardCard
-                                                            task={{
-                                                                id: task._id?.toString() || 'unknown',
-                                                                title: task.title || 'Untitled',
-                                                                priority: task.priority || 'medium',
-                                                                type: task.type || 'task',
-                                                                assignee: task.assignee ? { name: task.assignee.username, avatar: task.assignee.avatar || '' } : undefined,
-                                                                checklist: task.checklist,
-                                                                estimated_hours: task.estimated_hours,
-                                                                actual_hours: task.actual_hours
-                                                            }}
-                                                            onUpdate={() => fetchProjectData(projectId!, true)}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </Draggable>
-                                        ))}
-                                        {provided.placeholder}
-                                    </BoardColumn>
-                                </div>
-                            )}
-                        </Droppable>
+                                                        {(provided, snapshot) => (
+                                                            <div
+                                                                ref={provided.innerRef}
+                                                                {...provided.draggableProps}
+                                                                {...provided.dragHandleProps}
+                                                                style={{
+                                                                    ...provided.draggableProps.style,
+                                                                    opacity: snapshot.isDragging ? 0.9 : 1,
+                                                                    transform: snapshot.isDragging
+                                                                        ? `${provided.draggableProps.style?.transform} rotate(3deg)`
+                                                                        : provided.draggableProps.style?.transform
+                                                                }}
+                                                            >
+                                                                <BoardCard
+                                                                    task={{
+                                                                        id: task._id?.toString() || 'unknown',
+                                                                        title: task.title || 'Untitled',
+                                                                        priority: task.priority || 'medium',
+                                                                        type: task.type || 'task',
+                                                                        assignee: task.assignee ? { name: task.assignee.username, avatar: task.assignee.avatar || '' } : undefined,
+                                                                        checklist: task.checklist,
+                                                                        estimated_hours: task.estimated_hours,
+                                                                        actual_hours: task.actual_hours
+                                                                    }}
+                                                                    onUpdate={() => fetchProjectData(projectId!, true)}
+                                                                    projectMembers={project?.members || []}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                ))}
+                                                {provided.placeholder}
+                                            </BoardColumn>
+                                        </div>
+                                    )}
+                                </Droppable>
+                            ))}
 
-                        {/* IN PROGRESS Column */}
-                        <Droppable droppableId="inProgress">
-                            {(provided, snapshot) => (
-                                <div
-                                    ref={provided.innerRef}
-                                    {...provided.droppableProps}
-                                    className="min-w-[320px]"
-                                >
-                                    <BoardColumn
-                                        title="In Progress"
-                                        count={tasks.inProgress.length}
+                            {/* Add Column Button */}
+                            <div className="w-[280px] shrink-0 h-full">
+                                {!isAddingColumn ? (
+                                    <button
+                                        onClick={() => setIsAddingColumn(true)}
+                                        className="w-full h-[50px] flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all font-medium text-sm shrink-0"
                                     >
-                                        {tasks.inProgress.map((task, index) => (
-                                            <Draggable
-                                                key={task._id}
-                                                draggableId={task._id}
-                                                index={index}
+                                        <Plus size={16} />
+                                        Add Column
+                                    </button>
+                                ) : (
+                                    <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                                        <input
+                                            type="text"
+                                            value={newColumnTitle}
+                                            onChange={(e) => setNewColumnTitle(e.target.value)}
+                                            placeholder="Column Title"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 text-sm"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleAddColumn();
+                                                if (e.key === 'Escape') setIsAddingColumn(false);
+                                            }}
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleAddColumn}
+                                                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition"
                                             >
-                                                {(provided, snapshot) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        style={{
-                                                            ...provided.draggableProps.style,
-                                                            opacity: snapshot.isDragging ? 0.9 : 1,
-                                                            transform: snapshot.isDragging
-                                                                ? `${provided.draggableProps.style?.transform} rotate(3deg)`
-                                                                : provided.draggableProps.style?.transform
-                                                        }}
-                                                    >
-                                                        <BoardCard
-                                                            task={{
-                                                                id: task._id?.toString() || 'unknown',
-                                                                title: task.title || 'Untitled',
-                                                                priority: task.priority || 'medium',
-                                                                type: task.type || 'task',
-                                                                assignee: task.assignee ? { name: task.assignee.username, avatar: task.assignee.avatar || '' } : undefined,
-                                                                checklist: task.checklist,
-                                                                estimated_hours: task.estimated_hours,
-                                                                actual_hours: task.actual_hours
-                                                            }}
-                                                            onUpdate={() => fetchProjectData(projectId!, true)}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </Draggable>
-                                        ))}
-                                        {provided.placeholder}
-                                    </BoardColumn>
-                                </div>
-                            )}
-                        </Droppable>
-
-                        {/* DONE Column */}
-                        <Droppable droppableId="done">
-                            {(provided, snapshot) => (
-                                <div
-                                    ref={provided.innerRef}
-                                    {...provided.droppableProps}
-                                    className="min-w-[320px]"
-                                >
-                                    <BoardColumn
-                                        title="Done"
-                                        count={tasks.done.length}
-                                    >
-                                        {tasks.done.map((task, index) => (
-                                            <Draggable
-                                                key={task._id}
-                                                draggableId={task._id}
-                                                index={index}
+                                                Add
+                                            </button>
+                                            <button
+                                                onClick={() => setIsAddingColumn(false)}
+                                                className="p-1.5 text-slate-400 hover:bg-slate-100 rounded transition"
                                             >
-                                                {(provided, snapshot) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        style={{
-                                                            ...provided.draggableProps.style,
-                                                            opacity: snapshot.isDragging ? 0.9 : 1,
-                                                            transform: snapshot.isDragging
-                                                                ? `${provided.draggableProps.style?.transform} rotate(3deg)`
-                                                                : provided.draggableProps.style?.transform
-                                                        }}
-                                                    >
-                                                        <BoardCard
-                                                            task={{
-                                                                id: task._id?.toString() || 'unknown',
-                                                                title: task.title || 'Untitled',
-                                                                priority: task.priority || 'medium',
-                                                                type: task.type || 'task',
-                                                                assignee: task.assignee ? { name: task.assignee.username, avatar: task.assignee.avatar || '' } : undefined,
-                                                                checklist: task.checklist,
-                                                                estimated_hours: task.estimated_hours,
-                                                                actual_hours: task.actual_hours
-                                                            }}
-                                                            onUpdate={() => fetchProjectData(projectId!, true)}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </Draggable>
-                                        ))}
-                                        {provided.placeholder}
-                                    </BoardColumn>
-                                </div>
-                            )}
-                        </Droppable>
-
-                        {/* Add Column Button */}
-                        <button className="min-w-[280px] h-[50px] flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all font-medium text-sm">
-                            <Plus size={16} />
-                            Add Column
-                        </button>
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </DragDropContext>
             </div>
+
+            {projectId && (
+                <CreateTaskModal
+                    projectId={projectId}
+                    isOpen={isCreateTaskOpen}
+                    initialStatus={createTaskStatus}
+                    onClose={() => setIsCreateTaskOpen(false)}
+                    onTaskCreated={() => fetchProjectData(projectId)}
+                    projectMembers={project?.members || []}
+                />
+            )}
+
+            {projectId && (
+                <ProjectMembersModal
+                    projectId={projectId}
+                    isOpen={isMembersModalOpen}
+                    onClose={() => setIsMembersModalOpen(false)}
+                    currentMembers={project?.members || []}
+                    ownerId={project?.owner?._id || project?.owner || ''}
+                    onMembersUpdated={() => fetchProjectData(projectId)}
+                />
+            )}
         </div>
     );
 };

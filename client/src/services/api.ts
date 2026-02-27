@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 // API Base URL from environment variable
+// @ts-ignore
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Create axios instance with default config
@@ -60,6 +61,7 @@ export interface LoginData {
 
 export interface User {
     _id: string;
+    id?: string;
     username: string;
     email: string;
     role: 'admin' | 'member';
@@ -141,6 +143,11 @@ export const createProject = async (data: { name: string; description?: string }
     return response.data;
 };
 
+export const updateProject = async (id: string, data: any) => {
+    const response = await api.patch(`/projects/${id}`, data);
+    return response.data;
+};
+
 // ===================================================================
 // TASKS API
 // ===================================================================
@@ -179,6 +186,11 @@ export const reorderTask = async (taskId: string, newStatus: string, newPosition
     return response.data;
 };
 
+export const deleteTask = async (taskId: string) => {
+    const response = await api.delete(`/tasks/${taskId}`);
+    return response.data;
+};
+
 // ===================================================================
 // CHECKLIST API
 // ===================================================================
@@ -200,6 +212,61 @@ export const updateChecklistItem = async (taskId: string, index: number, title: 
 
 export const deleteChecklistItem = async (taskId: string, index: number) => {
     const response = await api.delete(`/tasks/${taskId}/checklist/${index}`);
+    return response.data;
+};
+
+// --- User & Member Operations ---
+
+export const searchUsers = async (query: string) => {
+    const response = await api.get(`/users/search?q=${query}`);
+    return response.data;
+};
+
+export const getContacts = async () => {
+    const response = await api.get('/users/contacts');
+    return response.data;
+};
+
+export const addProjectMember = async (projectId: string, userId: string) => {
+    const response = await api.post(`/projects/${projectId}/members/${userId}`);
+    return response.data;
+};
+
+export const removeProjectMember = async (projectId: string, userId: string) => {
+    const response = await api.delete(`/projects/${projectId}/members/${userId}`);
+    return response.data;
+};
+
+// ===================================================================
+// MESSAGES API
+// ===================================================================
+
+export const getRecentConversations = async () => {
+    const response = await api.get('/messages/recent');
+    return response.data;
+};
+
+export const getConversation = async (userId: string) => {
+    const response = await api.get(`/messages/${userId}`);
+    return response.data;
+};
+
+export const sendDirectMessage = async (userId: string, content: string) => {
+    const response = await api.post(`/messages/${userId}`, { content });
+    return response.data;
+};
+
+// ===================================================================
+// DASHBOARD API
+// ===================================================================
+
+export const getDashboardOverview = async () => {
+    const response = await api.get('/dashboard/overview');
+    return response.data;
+};
+
+export const askAIChatbot = async (message: string, history: any[]) => {
+    const response = await api.post('/ai/chat', { message, history });
     return response.data;
 };
 

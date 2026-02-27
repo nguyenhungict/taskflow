@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, MoreHorizontal } from 'lucide-react';
 import { getProjects, createProject } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 interface Project {
     _id: string;
@@ -17,6 +18,7 @@ const ProjectList: React.FC = () => {
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const toast = useToast();
 
     // Helper arrays for random UI enhancement
     const colors = ['bg-blue-600', 'bg-purple-600', 'bg-emerald-600', 'bg-orange-600', 'bg-pink-600', 'bg-indigo-600'];
@@ -57,9 +59,10 @@ const ProjectList: React.FC = () => {
         if (name) {
             try {
                 await createProject({ name, description: 'New project' });
+                toast.success('Project created successfully');
                 fetchProjects(); // Reload list
             } catch (err) {
-                alert('Failed to create project');
+                toast.error('Failed to create project');
             }
         }
     };
